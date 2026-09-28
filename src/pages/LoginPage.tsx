@@ -31,8 +31,8 @@ const LoginPage = () => {
   const [resendTimer, setResendTimer] = useState(0);
 
   // Username/Password Login State
-  const [email, setEmail] = useState('vohuman@rally.in');
-  const [password, setPassword] = useState('Test@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
