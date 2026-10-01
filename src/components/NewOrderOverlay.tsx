@@ -136,8 +136,20 @@ const NewOrderOverlay = ({ order: initialOrder, onAccept, onReject, onClose }: N
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
       <div className="w-full h-auto max-w-3xl overflow-hidden rounded-[32px] bg-white shadow-[0_32px_120px_rgba(15,23,42,0.3)] flex flex-col max-h-[95vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-8 py-5 pb-0 shrink-0">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">1 new order</h2>
+        <div className="flex items-center justify-between border-b border-slate-100 px-8 py-5 pb-3 shrink-0">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
+              {order.restaurantName ? `New order for ${order.restaurantName}` : '1 new order'}
+            </h2>
+            {order.restaurantName && (
+              <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
+                <svg className="h-3.5 w-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5" />
+                </svg>
+                <span>Outlet: <strong>{order.restaurantName}</strong></span>
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <button onClick={handleMuteToggle} className="text-slate-400 hover:text-slate-600 transition-colors" title={isMuted ? "Unmute sound" : "Mute sound"}>
               {isMuted ? (
@@ -163,7 +175,12 @@ const NewOrderOverlay = ({ order: initialOrder, onAccept, onReject, onClose }: N
           <div className="grid lg:grid-cols-[1.2fr_1fr]">
             {/* Left Column: Order Intelligence */}
             <div className="border-r border-slate-100 p-8">
-              <div className="flex gap-2.5">
+              <div className="flex flex-wrap gap-2.5">
+                {order.restaurantName && (
+                  <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-[10px] font-bold tracking-widest text-emerald-800 uppercase flex items-center gap-1">
+                    🏢 {order.restaurantName}
+                  </span>
+                )}
                 {loading ? (
                   <div className="h-6 w-24 animate-pulse rounded bg-violet-50"></div>
                 ) : (
