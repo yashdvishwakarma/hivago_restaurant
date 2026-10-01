@@ -46,3 +46,8 @@ export const updateOwnerBankDetailsAdmin = async (ownerId: string, payload: Upda
   return response.data;
 };
 
+export const toggleCrossOutletAcceptAdmin = async (ownerId: string, enabled: boolean): Promise<any> => {
+  const response = await client.put(`/admin/owners/${ownerId}/cross-outlet-accept`, { enabled });
+  return response.data;
+};
+

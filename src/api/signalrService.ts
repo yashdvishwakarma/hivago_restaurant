@@ -7,6 +7,7 @@ class SignalRService {
   private connection: HubConnection | null = null;
   private onNewOrderCallbacks: Array<(data: any) => void> = [];
   private onNotificationCallbacks: Array<(data: any) => void> = [];
+  private onOrderStatusUpdateCallbacks: Array<(data: any) => void> = [];
 
   constructor() {
     // Note: Connection is built but not started until start() is called
@@ -37,10 +38,17 @@ class SignalRService {
       this.onNotificationCallbacks.forEach(cb => cb(data));
     };
 
+    const handleOrderStatusUpdateEvent = (data: any) => {
+      this.onOrderStatusUpdateCallbacks.forEach(cb => cb(data));
+    };
+
     // Listen for order events
     this.connection.on('NewOrderReceived', handleOrderEvent);
     this.connection.on('NewOrder', handleOrderEvent);
     this.connection.on('OrderReceived', handleOrderEvent);
+
+    // Listen for order status update events
+    this.connection.on('OrderStatusUpdate', handleOrderStatusUpdateEvent);
 
     // Listen for general notification events
     this.connection.on('ReceiveNotification', handleNotificationEvent);
@@ -67,6 +75,13 @@ class SignalRService {
     this.onNewOrderCallbacks.push(callback);
     return () => {
       this.onNewOrderCallbacks = this.onNewOrderCallbacks.filter(c => c !== callback);
+    };
+  }
+
+  public onOrderStatusUpdate(callback: (data: any) => void): () => void {
+    this.onOrderStatusUpdateCallbacks.push(callback);
+    return () => {
+      this.onOrderStatusUpdateCallbacks = this.onOrderStatusUpdateCallbacks.filter(c => c !== callback);
     };
   }
 
