@@ -162,11 +162,16 @@ export const normalizeOrder = (raw: Record<string, unknown>): Order => {
     specialInstructions: item.specialInstructions ? String(item.specialInstructions) : undefined
   }));
 
+  const restaurantId = raw.restaurantId ? String(raw.restaurantId) : undefined;
+  const restaurantName = raw.restaurantName ? String(raw.restaurantName) : undefined;
+
   return {
     id: String(raw.id ?? raw.orderId ?? ''),
     orderNumber: String(raw.orderNumber ?? raw.id ?? raw.orderId ?? ''),
     status: normalizedStatus,
-    customerName: String(raw.customerName ?? raw.restaurantName ?? 'Guest'),
+    restaurantId,
+    restaurantName,
+    customerName: String(raw.customerName ?? 'Guest'),
     customerPhone: String(raw.customerPhone ?? raw.restaurantPhone ?? ''),
     customerNote: String(raw.specialInstructions ?? raw.customerNote ?? '') || undefined,
     pickupType: normalizePickupType(String(raw.fulfillmentType ?? raw.pickupType ?? (deliveryInfo ? 'DELIVERY' : 'PICKUP'))),
@@ -643,5 +648,18 @@ export const searchLocation = async (queryStr: string): Promise<any[]> => {
       return [];
     }
   }
+};
+
+export interface RestaurantOutlet {
+  id: string;
+  name: string;
+  rstCode?: string;
+  addressLine?: string;
+  isActive?: boolean;
+}
+
+export const fetchMyOutlets = async (): Promise<RestaurantOutlet[]> => {
+  const response = await client.get('/restaurants/me/outlets');
+  return response.data?.data || response.data || [];
 };
 

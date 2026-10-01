@@ -31,7 +31,12 @@ const HistoryTable = ({ orders }: HistoryTableProps) => {
               {orders.map((order) => (
                 <tr key={order.id} className="transition-colors hover:bg-slate-50/50 group">
                   <td className="px-8 py-3 text-sm font-semibold text-slate-900 border-b border-slate-200">
-                    #{order.orderNumber}
+                    <div>#{order.orderNumber}</div>
+                    {order.restaurantName && (
+                      <span className="inline-block mt-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                        {order.restaurantName}
+                      </span>
+                    )}
                   </td>
                   <td className="px-8 py-3 text-sm font-semibold text-slate-500 border-b border-slate-200">
                     {formatRelativeTime(order.createdAt)}

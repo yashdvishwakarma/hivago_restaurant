@@ -266,9 +266,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const orderNum = data.orderNumber || data.orderNo || data.orderCode || data.id || '';
     const formattedNum = String(orderNum).startsWith('#') ? orderNum : `#${orderNum}`;
     const amount = data.totalAmount || data.price || data.grossAmount || data.pricing?.finalTotal;
+    const outletText = data.restaurantName ? ` for ${data.restaurantName}` : '';
     const bodyText = amount 
-      ? `New order received for ₹${amount}. Click to open dashboard.` 
-      : 'A new order has arrived on your dashboard. Click to view details.';
+      ? `New order${outletText} received for ₹${amount}. Click to open dashboard.` 
+      : `A new order${outletText} has arrived on your dashboard. Click to view details.`;
 
     if (document.hidden || !document.hasFocus()) {
       startTitleBlinking(formattedNum);
@@ -276,7 +277,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     const triggerNativeNotification = async () => {
       try {
-        const title = `🔔 New Order ${formattedNum}`;
+        const title = `🔔 New Order ${formattedNum}${outletText}`;
         const options: NotificationOptions & { vibrate?: number[] } = {
           body: bodyText,
           icon: '/favicon.svg',
@@ -335,19 +336,31 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       const handleIncomingNotification = (data: any) => {
         setLastOrderReceived(data);
         const orderNum = data.orderNumber || data.orderNo || data.orderCode || data.id;
+        const outletLabel = data.restaurantName ? ` for ${data.restaurantName}` : '';
         const toastMsg = orderNum 
-          ? `New Order #${orderNum} received!` 
+          ? `New Order #${orderNum}${outletLabel} received!` 
           : (data.title || data.message || 'New notification received!');
         showToast(toastMsg, 'info');
         playNotification();
         showBrowserNotification(data);
       };
 
+      const handleStatusUpdate = (data: any) => {
+        const orderNum = data.orderNumber || data.orderNo || data.orderCode || data.orderId || data.id;
+        const status = data.status || data.orderStatus || 'updated';
+        const outletLabel = data.restaurantName ? ` (${data.restaurantName})` : '';
+        if (orderNum) {
+          showToast(`Order #${orderNum}${outletLabel} status updated: ${status}`, 'info');
+        }
+      };
+
       const unsubscribeOrder = signalRService.onNewOrder(handleIncomingNotification);
+      const unsubscribeStatus = signalRService.onOrderStatusUpdate(handleStatusUpdate);
       const unsubscribeNotif = signalRService.onNotification(handleIncomingNotification);
 
       return () => {
         unsubscribeOrder();
+        unsubscribeStatus();
         unsubscribeNotif();
         signalRService.stop();
         setIsConnected(false);

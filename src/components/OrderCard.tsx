@@ -290,6 +290,14 @@ const OrderCard = ({ order: initialOrder, onUpdate }: OrderCardProps) => {
           <div>
             <header className="flex flex-wrap items-center justify-between gap-2.5 font-inter">
               <div className="flex flex-wrap items-center gap-2">
+                {order.restaurantName && (
+                  <div className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                    <svg className="h-3.5 w-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5" />
+                    </svg>
+                    {order.restaurantName}
+                  </div>
+                )}
                 {loading ? (
                   <div className="h-7 w-20 animate-pulse rounded-lg bg-slate-100"></div>
                 ) : order.pickupType === 'DELIVERY' ? (

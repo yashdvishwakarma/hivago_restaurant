@@ -17,6 +17,8 @@ export interface Order {
   id: string;
   orderNumber: string;
   status: OrderStatus;
+  restaurantId?: string;
+  restaurantName?: string;
 
   customerName: string;
   customerPhone: string;
@@ -364,6 +366,8 @@ export interface Owner {
   bankAccountNumber?: string;
   bankIfscCode?: string;
   bankAccountName?: string;
+  crossOutletAcceptEnabled?: boolean;
+  isCrossOutletAcceptEnabled?: boolean;
 }
 
 export interface RestaurantMinimal {

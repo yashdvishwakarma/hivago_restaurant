@@ -38,13 +38,28 @@ export const useOrders = () => {
     }
     setError(null);
     try {
-      const response = await fetchOrders(user.id, { activeOnly: false, pageSize: 100 });
-      const allOrders = Array.isArray(response) ? response : [];
+      const outletsToFetch = Array.from(new Set([user.id, ...(user.restaurantIds || [])]));
+      const orderResponses = await Promise.all(
+        outletsToFetch.map(outletId => 
+          fetchOrders(outletId, { activeOnly: false, pageSize: 100 }).catch(err => {
+            console.warn(`Failed to fetch orders for outlet ${outletId}:`, err);
+            return [] as Order[];
+          })
+        )
+      );
+
+      const combinedOrders = orderResponses.flat();
+      const uniqueOrdersMap = new Map<string, Order>();
+      combinedOrders.forEach(order => uniqueOrdersMap.set(order.id, order));
+      const allOrders = Array.from(uniqueOrdersMap.values());
       
       // Filter out orders with pending payment status
       const latestOrders = allOrders.filter(order => 
         order.paymentStatus?.toUpperCase() !== 'PENDING'
       );
+
+      // Sort by createdAt descending
+      latestOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       if (initialLoadRef.current) {
         const previousIds = new Set(previousOrderIdsRef.current);
@@ -101,7 +116,7 @@ export const useOrders = () => {
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [user?.id, authLoading]);
+  }, [user?.id, user?.restaurantIds, authLoading]);
 
   // Handle Real-Time Updates from SignalR
   useEffect(() => {
@@ -114,6 +129,9 @@ export const useOrders = () => {
       // Force status to PENDING since it is received via NewOrderReceived event
       normalizedOrder.status = 'PENDING';
       
+      // Prepend to local orders list immediately
+      updateLocalOrder(normalizedOrder);
+
       // Instantly open the popup when the event triggers (ensuring it matches the sound play)
       setNewOrder(normalizedOrder);
       
@@ -131,7 +149,10 @@ export const useOrders = () => {
 
   const updateLocalOrder = (updatedOrder: Order) => {
     setOrders(prev => {
-      const next = prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
+      const exists = prev.some(o => o.id === updatedOrder.id);
+      const next = exists
+        ? prev.map(o => o.id === updatedOrder.id ? updatedOrder : o)
+        : [updatedOrder, ...prev];
       const remainingPending = next.filter(o => o.status === 'PENDING');
       if (remainingPending.length === 0) {
         stopNotification();
