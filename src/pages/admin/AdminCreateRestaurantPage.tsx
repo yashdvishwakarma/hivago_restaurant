@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createOwner, createRestaurant, getAllOwners, CreateOwnerPayload, CreateRestaurantPayload } from '../../api/adminApi';
+import { createOwner, createRestaurant, getAllOwners, toggleCrossOutletAcceptAdmin, CreateOwnerPayload, CreateRestaurantPayload } from '../../api/adminApi';
 import { Owner } from '../../types';
 import { useToast } from '../../context/ToastContext';
 
@@ -9,7 +9,23 @@ const AdminCreateRestaurantPage = () => {
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingOwners, setFetchingOwners] = useState(true);
+  const [crossAcceptEnabled, setCrossAcceptEnabled] = useState(false);
+  const [togglingCrossAccept, setTogglingCrossAccept] = useState(false);
   const { showToast } = useToast();
+
+  const handleToggleCrossAccept = async (enabled: boolean) => {
+    if (!selectedOwnerId) return;
+    setTogglingCrossAccept(true);
+    try {
+      await toggleCrossOutletAcceptAdmin(selectedOwnerId, enabled);
+      setCrossAcceptEnabled(enabled);
+      showToast(`Cross-outlet accept ${enabled ? 'enabled' : 'disabled'} for owner`, 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to update cross-outlet accept setting', 'error');
+    } finally {
+      setTogglingCrossAccept(false);
+    }
+  };
 
   
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>('');
@@ -114,12 +130,35 @@ const AdminCreateRestaurantPage = () => {
                   ) : (
                     <select 
                       value={selectedOwnerId}
-                      onChange={(e) => setSelectedOwnerId(e.target.value)}
+                      onChange={(e) => {
+                        const ownerId = e.target.value;
+                        setSelectedOwnerId(ownerId);
+                        const found = owners.find(o => o.id === ownerId);
+                        setCrossAcceptEnabled(Boolean(found?.crossOutletAcceptEnabled ?? found?.isCrossOutletAcceptEnabled));
+                      }}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-semibold outline-none focus:border-brand-500 transition-all"
                     >
                       <option value="">Select an owner...</option>
                       {owners.map(o => <option key={o.id} value={o.id}>{o.name} ({o.email})</option>)}
                     </select>
+                  )}
+                  {selectedOwnerId && (
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Multi-Outlet Cross-Accept</h4>
+                        <p className="text-[11px] text-slate-500">Enable receiving & accepting orders for all outlets under this owner.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCrossAccept(!crossAcceptEnabled)}
+                        disabled={togglingCrossAccept}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all shadow-sm ${
+                          crossAcceptEnabled ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                      >
+                        {togglingCrossAccept ? 'Saving...' : crossAcceptEnabled ? 'ENABLED' : 'DISABLED'}
+                      </button>
+                    </div>
                   )}
                   <button 
                     onClick={handleSelectExistingOwner}

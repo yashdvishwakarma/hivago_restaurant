@@ -6,6 +6,36 @@ import { LoginCredentials, LoginResponse, loginRestaurant, refreshAuthToken, ver
 import { AuthRole } from '../types';
 import { loginOwner, verifyOwnerOtp, switchOutlet as switchOutletApi } from '../api/ownerApi';
 
+function parseJwt(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function extractRestaurantIdsFromToken(token: string): string[] | undefined {
+  const claims = parseJwt(token);
+  if (!claims) return undefined;
+  const rawIds = claims.restaurant_ids || claims.restaurantIds || claims.restaurant_id;
+  if (typeof rawIds === 'string' && rawIds.trim()) {
+    return rawIds.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (Array.isArray(rawIds)) {
+    return rawIds.map(String).filter(Boolean);
+  }
+  return undefined;
+}
+
 interface AuthUser {
   id: string;
   name: string;
@@ -16,6 +46,7 @@ interface AuthUser {
   ownerId?: string;
   ownerName?: string;
   ownerEmail?: string;
+  restaurantIds?: string[];
 }
 
 interface AuthContextValue {
@@ -67,7 +98,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       client.defaults.headers.common.Authorization = `Bearer ${savedAccessToken}`;
       if (savedUser) {
         try {
-          setUser(JSON.parse(savedUser));
+          const parsedUser = JSON.parse(savedUser);
+          const tokenRestaurantIds = extractRestaurantIdsFromToken(savedAccessToken);
+          setUser({
+            ...parsedUser,
+            restaurantIds: tokenRestaurantIds || parsedUser.restaurantIds
+          });
         } catch {
           setUser(null);
         }
@@ -79,7 +115,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setRefreshToken(savedRefreshToken);
       if (savedUser) {
         try {
-          setUser(JSON.parse(savedUser));
+          const parsedUser = JSON.parse(savedUser);
+          const tokenRestaurantIds = extractRestaurantIdsFromToken(savedAccessToken);
+          setUser({
+            ...parsedUser,
+            restaurantIds: tokenRestaurantIds || parsedUser.restaurantIds
+          });
         } catch {
           // ignore
         }
@@ -97,6 +138,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           targetStorage.setItem(ACCESS_TOKEN_KEY, response.accessToken);
           targetStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
           targetStorage.setItem(`${ACCESS_TOKEN_KEY}_expires_at`, response.accessTokenExpiresAt);
+
+          const refreshedIds = extractRestaurantIdsFromToken(response.accessToken);
+          if (savedUser) {
+            try {
+              const parsedUser = JSON.parse(savedUser);
+              const updatedUser = { ...parsedUser, restaurantIds: refreshedIds || parsedUser.restaurantIds };
+              setUser(updatedUser);
+              targetStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+            } catch {
+              // ignore
+            }
+          }
           
           client.defaults.headers.common.Authorization = `Bearer ${response.accessToken}`;
           console.log('[Auth] Silent refresh on mount succeeded, session restored.');
@@ -205,6 +258,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
+    const restaurantIds = extractRestaurantIdsFromToken(response.accessToken);
     const newUser: AuthUser = {
       id: role === 'owner' ? (profileData?.id || (response as any).ownerId) : (response as any).restaurantId,
       name: role === 'owner' ? (profileData?.name || response.name || 'Owner') : response.name,
@@ -213,7 +267,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       originalRole: role,
       ownerId: role === 'owner' ? (profileData?.id || (response as any).ownerId) : undefined,
       ownerName: role === 'owner' ? (profileData?.name || response.name || 'Owner') : undefined,
-      ownerEmail: role === 'owner' ? (profileData?.email || credentials.email) : undefined
+      ownerEmail: role === 'owner' ? (profileData?.email || credentials.email) : undefined,
+      restaurantIds
     };
     setUser(newUser);
 
@@ -256,6 +311,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
+    const restaurantIdsFromOtp = extractRestaurantIdsFromToken(response.accessToken);
     const newUser: AuthUser = {
       id: role === 'owner' ? (profileData?.id || (response as any).ownerId) : (response as any).restaurantId,
       name: role === 'owner' ? (profileData?.name || response.name || 'Owner') : response.name,
@@ -264,7 +320,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       originalRole: role,
       ownerId: role === 'owner' ? (profileData?.id || (response as any).ownerId) : undefined,
       ownerName: role === 'owner' ? (profileData?.name || response.name || 'Owner') : undefined,
-      ownerEmail: role === 'owner' ? (profileData?.email || phone) : undefined
+      ownerEmail: role === 'owner' ? (profileData?.email || phone) : undefined,
+      restaurantIds: restaurantIdsFromOtp
     };
     setUser(newUser);
 
@@ -290,13 +347,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Update user role and ID to restaurant for the dashboard
     if (user) {
+      const switchedRestaurantIds = extractRestaurantIdsFromToken(response.accessToken);
       const updatedUser: AuthUser = {
         ...user,
         id: response.restaurantId,
         name: response.name || user.name,
         role: 'restaurant',
         originalRole: user.originalRole || user.role,
-        outletId: response.restaurantId
+        outletId: response.restaurantId,
+        restaurantIds: switchedRestaurantIds || user.restaurantIds
       };
       setUser(updatedUser);
       const storage = localStorage.getItem(ACCESS_TOKEN_KEY) ? localStorage : sessionStorage;
