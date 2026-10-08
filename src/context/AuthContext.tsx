@@ -6,6 +6,8 @@ import { LoginCredentials, LoginResponse, loginRestaurant, refreshAuthToken, ver
 import { AuthRole } from '../types';
 import { loginOwner, verifyOwnerOtp, switchOutlet as switchOutletApi } from '../api/ownerApi';
 
+import { fetchMyOutlets } from '../api/dashboardApi';
+
 function parseJwt(token: string): any {
   try {
     const base64Url = token.split('.')[1];
@@ -26,7 +28,7 @@ function parseJwt(token: string): any {
 function extractRestaurantIdsFromToken(token: string): string[] | undefined {
   const claims = parseJwt(token);
   if (!claims) return undefined;
-  const rawIds = claims.restaurant_ids || claims.restaurantIds || claims.restaurant_id;
+  const rawIds = claims.restaurant_ids || claims.restaurantIds || claims.restaurant_id || claims.sibling_restaurant_ids || claims.siblingRestaurantIds || claims.outlet_ids;
   if (typeof rawIds === 'string' && rawIds.trim()) {
     return rawIds.split(',').map(s => s.trim()).filter(Boolean);
   }
@@ -181,6 +183,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.addEventListener('hivago-unauthorized', handleUnauthorized);
     return () => window.removeEventListener('hivago-unauthorized', handleUnauthorized);
   }, []);
+
+  // Fetch sibling outlets for cross-outlet accept support
+  useEffect(() => {
+    if (user?.id) {
+      fetchMyOutlets()
+        .then(outlets => {
+          if (outlets && Array.isArray(outlets) && outlets.length > 0) {
+            const outletIds = outlets.map(o => o.id).filter(Boolean);
+            if (outletIds.length > 0) {
+              setUser(prev => {
+                if (!prev) return null;
+                const currentIds = prev.restaurantIds || [];
+                const combined = Array.from(new Set([...currentIds, ...outletIds]));
+                if (combined.length === currentIds.length && combined.every(id => currentIds.includes(id))) {
+                  return prev;
+                }
+                const updated = { ...prev, restaurantIds: combined };
+                const storage = localStorage.getItem(ACCESS_TOKEN_KEY) ? localStorage : sessionStorage;
+                storage.setItem(USER_KEY, JSON.stringify(updated));
+                return updated;
+              });
+            }
+          }
+        })
+        .catch(err => {
+          console.warn('[Auth] Failed to fetch sibling outlets for cross-outlet accept:', err);
+        });
+    }
+  }, [user?.id]);
 
   // Expiration Tracker
   useEffect(() => {

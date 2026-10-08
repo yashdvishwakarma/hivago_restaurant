@@ -116,7 +116,7 @@ export const useOrders = () => {
     }, 15000);
 
     return () => clearInterval(timer);
-  }, [user?.id, user?.restaurantIds, authLoading]);
+  }, [user?.id, user?.restaurantIds?.join(','), authLoading]);
 
   // Handle Real-Time Updates from SignalR
   useEffect(() => {
