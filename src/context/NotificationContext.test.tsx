@@ -32,6 +32,7 @@ vi.mock('../api/signalrService', () => ({
     stop: vi.fn(),
     isConnected: vi.fn().mockReturnValue(true),
     onNewOrder: vi.fn().mockReturnValue(() => {}),
+    onOrderStatusUpdate: vi.fn().mockReturnValue(() => {}),
     onNotification: vi.fn().mockReturnValue(() => {}),
   },
 }));

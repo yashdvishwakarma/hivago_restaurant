@@ -24,15 +24,27 @@ export const ToastProvider = ({ children }: { children: React.ReactNode }) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration: number = 4000) => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration: number = 3000) => {
     setToasts((prev) => {
-      // Deduplication: Don't show same message twice within 2 seconds
       const now = Date.now();
-      const isDuplicate = prev.some(t => t.message === message && (now - Number(t.id.split('-')[0])) < 2000);
+      // Extract order number if present (e.g. #ORD-20261009-00380) for smart deduplication
+      const orderMatch = message.match(/#[\w-]+/);
+      const orderNum = orderMatch ? orderMatch[0] : null;
+
+      const isDuplicate = prev.some(t => {
+        const timeDiff = now - Number(t.id.split('-')[0]);
+        if (timeDiff >= 3000) return false;
+        if (t.message === message) return true;
+        if (orderNum && t.message.includes(orderNum)) return true;
+        return false;
+      });
+
       if (isDuplicate) return prev;
 
       const id = `${now}-${Math.random().toString(36).substring(2, 9)}`;
-      return [...prev, { id, message, type, duration }];
+      const nextToasts = [...prev, { id, message, type, duration }];
+      // Keep only max 2 visible toasts at a time to prevent UI clutter
+      return nextToasts.slice(-2);
     });
   }, []);
 
