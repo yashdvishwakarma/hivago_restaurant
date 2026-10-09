@@ -23,7 +23,7 @@ interface OrderCardProps {
 const OrderCard = ({ order: initialOrder, onUpdate }: OrderCardProps) => {
   const [order, setOrder] = useState<Order>(() => {
     const cachedDetail = getCachedOrderDetail(initialOrder.id);
-    return cachedDetail ? { ...initialOrder, ...cachedDetail } as Order : initialOrder;
+    return cachedDetail ? { ...cachedDetail, ...initialOrder } as Order : initialOrder;
   });
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -95,22 +95,23 @@ const OrderCard = ({ order: initialOrder, onUpdate }: OrderCardProps) => {
   useEffect(() => {
     // Hydrate from cache immediately if present
     const cached = getCachedOrderDetail(initialOrder.id);
-    const mergedInitial = cached ? { ...initialOrder, ...cached } : initialOrder;
+    const mergedInitial = cached ? { ...cached, ...initialOrder } : initialOrder;
 
     // Sync local state with prop when it changes (especially status)
     setOrder(prev => ({
       ...prev,
       ...mergedInitial,
-      customerPhone: mergedInitial.customerPhone || prev.customerPhone,
-      address: mergedInitial.address || prev.address,
-      customerName: mergedInitial.customerName || prev.customerName,
-      customerNote: mergedInitial.customerNote || prev.customerNote,
-      paymentStatus: mergedInitial.paymentStatus || prev.paymentStatus,
-      paymentStatusDisplay: mergedInitial.paymentStatusDisplay || prev.paymentStatusDisplay,
-      riderName: mergedInitial.riderName || prev.riderName,
-      riderPhone: mergedInitial.riderPhone || prev.riderPhone,
-      otp: mergedInitial.otp || prev.otp,
-      items: (mergedInitial.items && mergedInitial.items.length > 0) ? mergedInitial.items : prev.items
+      status: initialOrder.status || prev.status,
+      customerPhone: initialOrder.customerPhone || mergedInitial.customerPhone || prev.customerPhone,
+      address: initialOrder.address || mergedInitial.address || prev.address,
+      customerName: initialOrder.customerName || mergedInitial.customerName || prev.customerName,
+      customerNote: initialOrder.customerNote || mergedInitial.customerNote || prev.customerNote,
+      paymentStatus: initialOrder.paymentStatus || mergedInitial.paymentStatus || prev.paymentStatus,
+      paymentStatusDisplay: initialOrder.paymentStatusDisplay || mergedInitial.paymentStatusDisplay || prev.paymentStatusDisplay,
+      riderName: initialOrder.riderName || mergedInitial.riderName || prev.riderName,
+      riderPhone: initialOrder.riderPhone || mergedInitial.riderPhone || prev.riderPhone,
+      otp: initialOrder.otp || mergedInitial.otp || prev.otp,
+      items: (initialOrder.items && initialOrder.items.length > 0) ? initialOrder.items : ((mergedInitial.items && mergedInitial.items.length > 0) ? mergedInitial.items : prev.items)
     }));
 
     const loadFullDetails = async () => {
@@ -127,8 +128,8 @@ const OrderCard = ({ order: initialOrder, onUpdate }: OrderCardProps) => {
         setLoading(true);
         try {
           const fullOrder = await fetchOrderById(initialOrder.id);
-          setOrder(fullOrder);
-          saveOrderDetailToCache(initialOrder.id, fullOrder);
+          setOrder({ ...fullOrder, status: initialOrder.status || fullOrder.status });
+          saveOrderDetailToCache(initialOrder.id, { ...fullOrder, status: initialOrder.status || fullOrder.status });
           fetchedIdsRef.current.add(initialOrder.id);
         } catch (err: any) {
           console.error(`Failed to fetch details for order ${initialOrder.id}`, err);
@@ -209,7 +210,6 @@ const OrderCard = ({ order: initialOrder, onUpdate }: OrderCardProps) => {
       const updatedOrder = await customerPickupOrder(order.id);
       setOrder(updatedOrder);
       if (onUpdate) onUpdate(updatedOrder);
-      showToast(`Order #${order.orderNumber} marked as picked up by customer`, 'success');
     } catch (err: any) {
       // Rollback
       setOrder(originalOrder);
