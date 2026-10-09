@@ -7,7 +7,7 @@ import { getCachedOrders, saveOrdersToCache, updateOrderInCache } from '../utils
 
 export const useOrders = () => {
   const { user, loading: authLoading } = useAuth();
-  const { lastOrderReceived, clearLastOrderReceived, stopNotification, playNotification, showBrowserNotification } = useNotifications();
+  const { lastOrderReceived, clearLastOrderReceived, lastStatusUpdate, clearLastStatusUpdate, stopNotification, playNotification, showBrowserNotification } = useNotifications();
   const [orders, setOrders] = useState<Order[]>([]);
   const [newOrder, setNewOrderState] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,11 +147,55 @@ export const useOrders = () => {
     }
   }, [lastOrderReceived]);
 
-  const updateLocalOrder = (updatedOrder: Order) => {
+  // Handle Real-Time Order Status Updates from SignalR
+  useEffect(() => {
+    if (lastStatusUpdate) {
+      console.log('Real-time order status update received:', lastStatusUpdate);
+      const updatedId = lastStatusUpdate.orderId || lastStatusUpdate.id;
+      const updatedOrderNum = lastStatusUpdate.orderNumber || lastStatusUpdate.orderNo || lastStatusUpdate.orderCode;
+      const newStatus = lastStatusUpdate.status || lastStatusUpdate.orderStatus;
+
+      if (updatedId || updatedOrderNum) {
+        setOrders(prev => {
+          const updated = prev.map(o => {
+            if ((updatedId && o.id === updatedId) || (updatedOrderNum && String(o.orderNumber) === String(updatedOrderNum))) {
+              return { ...o, status: newStatus || o.status };
+            }
+            return o;
+          });
+          const remainingPending = updated.filter(o => o.status === 'PENDING');
+          if (remainingPending.length === 0) {
+            stopNotification();
+          }
+          return updated;
+        });
+
+        // Close modal and stop sound if updated order is no longer PENDING
+        if (newStatus && newStatus.toUpperCase() !== 'PENDING') {
+          setNewOrderState(prevNewOrder => {
+            if (prevNewOrder) {
+              const matchesId = updatedId && prevNewOrder.id === updatedId;
+              const matchesNum = updatedOrderNum && String(prevNewOrder.orderNumber) === String(updatedOrderNum);
+              if (matchesId || matchesNum) {
+                stopNotification();
+                return null;
+              }
+            }
+            return prevNewOrder;
+          });
+        }
+
+        refreshOrders(true);
+      }
+      clearLastStatusUpdate();
+    }
+  }, [lastStatusUpdate]);
+
+  const updateLocalOrderFromSync = (updatedOrder: Order) => {
     setOrders(prev => {
       const exists = prev.some(o => o.id === updatedOrder.id);
       const next = exists
-        ? prev.map(o => o.id === updatedOrder.id ? updatedOrder : o)
+        ? prev.map(o => o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o)
         : [updatedOrder, ...prev];
       const remainingPending = next.filter(o => o.status === 'PENDING');
       if (remainingPending.length === 0) {
@@ -160,8 +204,77 @@ export const useOrders = () => {
       return next;
     });
 
+    if (updatedOrder.status && updatedOrder.status.toUpperCase() !== 'PENDING') {
+      setNewOrderState(prevNewOrder => {
+        if (prevNewOrder) {
+          const matchesId = prevNewOrder.id === updatedOrder.id;
+          const matchesNum = String(prevNewOrder.orderNumber) === String(updatedOrder.orderNumber);
+          if (matchesId || matchesNum) {
+            stopNotification();
+            return null;
+          }
+        }
+        return prevNewOrder;
+      });
+    }
+  };
+
+  // Cross-tab Synchronization using BroadcastChannel & localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let channel: BroadcastChannel | null = null;
+    if ('BroadcastChannel' in window) {
+      channel = new BroadcastChannel('hivago_order_updates_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'ORDER_UPDATED' && event.data?.order) {
+          updateLocalOrderFromSync(event.data.order);
+        }
+      };
+    }
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'hivago_last_order_update_broadcast' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && parsed.id) {
+            updateLocalOrderFromSync(parsed);
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  const updateLocalOrder = (updatedOrder: Order) => {
+    updateLocalOrderFromSync(updatedOrder);
+
     if (user?.id) {
       updateOrderInCache(user.id, updatedOrder);
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        if ('BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('hivago_order_updates_channel');
+          channel.postMessage({ type: 'ORDER_UPDATED', order: updatedOrder });
+          channel.close();
+        }
+        localStorage.setItem('hivago_last_order_update_broadcast', JSON.stringify({
+          ...updatedOrder,
+          _timestamp: Date.now()
+        }));
+      }
+    } catch (err) {
+      console.warn('Failed to broadcast order update cross-tab:', err);
     }
   };
 

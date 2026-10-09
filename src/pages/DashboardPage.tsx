@@ -69,7 +69,7 @@ const DashboardPage = () => {
   const [newOrderModal, setNewOrderModal] = useState<Order | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const { showToast } = useToast();
-  const { stats, loading: loadingStats, error: statsError } = useDashboardStats(range);
+  const { stats, loading: loadingStats, error: statsError, refreshStats } = useDashboardStats(range);
   const { orders, newOrder, setNewOrder, refreshOrders, updateLocalOrder, loading: loadingOrders, error: ordersError } = useOrders();
 
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(() => {
@@ -90,6 +90,7 @@ const DashboardPage = () => {
 
   const handleOrderUpdate = (updatedOrder: Order) => {
     updateLocalOrder(updatedOrder);
+    refreshStats(true);
     
     let type: 'success' | 'info' = 'success';
     let msg = `Order #${updatedOrder.orderNumber} is now ${updatedOrder.status.toLowerCase()}`;
@@ -108,8 +109,23 @@ const DashboardPage = () => {
   useEffect(() => {
     if (newOrder) {
       setNewOrderModal(newOrder);
+    } else {
+      setNewOrderModal(null);
     }
   }, [newOrder]);
+
+  // Dismiss modal if order in state list is no longer PENDING
+  useEffect(() => {
+    if (newOrderModal) {
+      const activeOrderInList = orders.find(
+        o => o.id === newOrderModal.id || o.orderNumber === newOrderModal.orderNumber
+      );
+      if (activeOrderInList && activeOrderInList.status !== 'PENDING') {
+        setNewOrderModal(null);
+        setNewOrder(null);
+      }
+    }
+  }, [orders, newOrderModal]);
 
   const handleConfirm = async (prepTime: number, deliveryPartner: 'HIVAGO' | 'RESTAURANT') => {
     if (!newOrderModal) return;

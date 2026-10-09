@@ -9,6 +9,8 @@ export type NotificationPermissionStatus = 'granted' | 'denied' | 'default' | 'u
 interface NotificationContextType {
   lastOrderReceived: any | null;
   clearLastOrderReceived: () => void;
+  lastStatusUpdate: any | null;
+  clearLastStatusUpdate: () => void;
   isConnected: boolean;
   permissionStatus: NotificationPermissionStatus;
   playNotification: () => void;
@@ -129,6 +131,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const { isAuthenticated, user } = useAuth();
   const { showToast } = useToast();
   const [lastOrderReceived, setLastOrderReceived] = useState<any | null>(null);
+  const [lastStatusUpdate, setLastStatusUpdate] = useState<any | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState(true);
@@ -346,6 +349,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       };
 
       const handleStatusUpdate = (data: any) => {
+        setLastStatusUpdate(data);
         const orderNum = data.orderNumber || data.orderNo || data.orderCode || data.orderId || data.id;
         const status = data.status || data.orderStatus || 'updated';
         const outletLabel = data.restaurantName ? ` (${data.restaurantName})` : '';
@@ -446,10 +450,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     setLastOrderReceived(null);
   };
 
+  const clearLastStatusUpdate = () => {
+    setLastStatusUpdate(null);
+  };
+
   return (
     <NotificationContext.Provider value={{
       lastOrderReceived,
       clearLastOrderReceived,
+      lastStatusUpdate,
+      clearLastStatusUpdate,
       isConnected,
       permissionStatus,
       playNotification,
